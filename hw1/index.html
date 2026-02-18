@@ -33,14 +33,18 @@
 
 		<br>
 
-		Link to GitHub repository: (TODO) <a href="https://cs184.eecs.berkeley.edu/sp25">cs184.eecs.berkeley.edu/sp25</a>
+		Link to webpage: <a href="https://cal-cs184-student.github.io/hw-webpages-Awinfredwa/hw1/index.html">https://cal-cs184-student.github.io/hw-webpages-Awinfredwa/hw1/index.html</a>
+		
+		<br>
 
-		<h2>Overview</h2>
-		<p>
-			In this homework, I implemented a software rasterizer from scratch, building up from basic triangle drawing all the way to full texture mapping with mipmaps. Starting with a simple bounding-box triangle test, I added supersampling for antialiasing, affine transforms to animate a robot figure, barycentric coordinate interpolation for smooth color gradients, and finally two levels of texture sampling (nearest vs. bilinear pixel sampling, and zero/nearest/linear mip-level selection). The most interesting takeaway was seeing how each technique builds on the last: supersampling, bilinear filtering, and trilinear mipmapping all attack the same aliasing problem from different angles, and combining them produces dramatically cleaner results than any single method alone.
-		</p>
+			Link to GitHub repository: <a href="https://github.com/cal-cs184-student/hw1-rasterizer-winfred">https://github.com/cal-cs184-student/hw-rasterizer-winfred</a>
 
-		<h2>Task 1: Drawing Single-Color Triangles</h2>
+			<h2>Overview</h2>
+			<p>
+				In this homework, I implemented a software rasterizer from scratch, building up from basic triangle drawing all the way to full texture mapping with mipmaps. Starting with a simple bounding-box triangle test, I added supersampling for antialiasing, affine transforms to animate a robot figure, barycentric coordinate interpolation for smooth color gradients, and finally two levels of texture sampling (nearest vs. bilinear pixel sampling, and zero/nearest/linear mip-level selection). The most interesting takeaway was seeing how each technique builds on the last: supersampling, bilinear filtering, and trilinear mipmapping all attack the same aliasing problem from different angles, and combining them produces dramatically cleaner results than any single method alone.
+			</p>
+
+			<h2>Task 1: Drawing Single-Color Triangles</h2>
 		<p>
 			To rasterize a triangle, I first compute a tight axis-aligned bounding box by taking the min and max of the three vertex x- and y-coordinates (clamped to the framebuffer dimensions). I then iterate over every integer pixel \((x, y)\) inside that bounding box and test whether the pixel center \((x + 0.5,\; y + 0.5)\) lies inside the triangle using the three-edge (half-plane) test: for each directed edge of the triangle I compute the signed value \( L_i = (P - V_i) \times (V_{i+1} - V_i) \) and check that all three values share the same sign (handling both winding orders). Only pixels that pass all three tests are filled.
 		</p>
