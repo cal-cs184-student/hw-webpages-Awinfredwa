@@ -1,0 +1,93 @@
+Write up:
+
+Part 1: Triangle Rasterization
+- Computed bounding box using min/max of triangle vertices
+- Sampled at pixel center (x + 0.5, y + 0.5) for each pixel in bounding box
+- Used 3 line test to determine if sample is inside triangle
+- Checked if all three line tests have the same sign
+- Efficiency: O(bounding box area), only loop through pixels in bounding box once
+
+
+Part 2: Antialiasing by Supersampling
+
+Algorithm & Data Structures:
+- Sample buffer stores width * height * sample_rate Color objects, with all samples for each pixel stored consecutively
+- For sample rate N, subdivide each pixel into sqrt(N) x sqrt(N) grid 
+- Sample at center of each sub-pixel: x + (sub_x + 0.5) / sqrt(sample_rate)
+- Perform 3 line test for each sample
+- Store results in sample_buffer at index: (y * width + x) * sample_rate + (sub_y * sqrt_rate + sub_x)
+
+Why Supersampling is Useful:
+Single sampling produces harsh stair like edges. Supersampling allows pixels along edges to blend between triangle and background colors based on coverage percentage, producing smooth antialiased edges critical for thin triangles and sharp corners.
+
+Pipeline Modifications:
+1. rasterize_triangle(): Loop through sqrt(sample_rate) x sqrt(sample_rate) sub-pixel locations and test each one
+2. fill_pixel(): Fill all sample_rate samples with same color for points/lines (no antialiasing needed)
+3. set_sample_rate() & set_framebuffer_target(): Resize sample_buffer to width * height * sample_rate
+4. resolve_to_framebuffer(): Average all samples per pixel, then convert float Color to 8 bit RGB
+
+How Supersampling Antialiases:
+At triangle edges, some samples are inside while others are outside. Averaging these samples produces a blended color proportional to coverage, creating smooth color gradients instead of hard transitions.
+
+Sample Rate Comparison (test4.svg):
+- Rate 1: Stair like edges, disconnected thin features, pixelated corners
+- Rate 4: Noticeably smoother edges, better connectivity, visible color gradients, some artifacts remain on very thin features
+- Rate 16: Very smooth edges, excellent thin feature preservation, fine gradients, visually highest quality
+
+Why These Results Occur:
+Rate 1 gives binary decisions. Rate 4 provides 5 coverage levels (0%, 25%, 50%, 75%, 100%). Rate 16 provides 17 levels (0%, 6.25%, ..., 100%), enabling smoother antialiasing. 
+
+Part 3:
+Cubeman surrenders
+
+Part 4: Barycentric Coordinates
+Barycentric coordinates allows colors to interpolate within a triangle. Take this trangle with vertices ABC for example.
+Coordinate A has color red, B has blue, and C has green. 
+To find the "color in the middle" for point P in this triangle, the formula is P = u·A + v·B + w·C where u + v + w = 1.
+Here "u" means the area of sub-trangle PCB divided by the area of the whole trangle. 
+By doing this, barycentric coordinates can decide the color of a point inside a triangle as weighted contributions of the color of its three vertices. 
+
+Part 5: Pixel Sampling for Texture Mapping
+
+What is Pixel Sampling:
+Pixel sampling determines how we retrieve color from a texture when UV coordinates fall between texel centers. Since UV coordinates are continuous (0.0 to 1.0) but textures are discrete grids of pixels (texels), we need a method to map UV coordinates to actual texel colors.
+
+Implementation:
+
+Nearest:
+Converts UV [0,1] to texel coordinates by multiplying by texture dimensions. Subtracts 0.5 to account for texels being centered at 0.5, 1.5, etc., then uses round() to find the nearest texel. Clamps the result to valid texture bounds using std::max and std::min to prevent out-of-bounds access. Returns the single texel color via get_texel(). Fast but produces blocky, pixelated results when magnifying, sort of like Minecraft.
+
+Bilinear:
+Converts UV to continuous texel coordinates (subtract 0.5 offset). Uses floor() to get the four surrounding texels at positions (x0,y0), (x1,y0), (x0,y1), (x1,y1). Clamps all four positions to texture bounds. Retrieves all four texel colors. Computes fractional weights s = x - floor(x) and t = y - floor(y) representing position within the 2x2 texel grid. Performs horizontal lerps on top edge (c00 to c10) and bottom edge (c01 to c11), then vertical lerp between results. Returns smoothly interpolated color. 
+
+Comparison (bird's beak):
+At 1 sample per pixel: Large visual difference. Nearest produces harsh, blocky edges with visible pixelation. Bilinear creates smooth color gradients and softer edges.
+At 16 samples per pixel: Both methods produce smooth results with minimal visible difference.
+
+Why:
+At 1 spp, each pixel uses a single texture sample, so nearest's blocky texel boundaries are directly visible. With 16 spp, each pixel averages 16 texture samples from slightly different UV coordinates. Even with nearest sampling, these 16 discrete texel values get averaged together and effectively blurs the result similar to what bilinear does. 
+
+Part 6: Level Sampling with Mipmaps
+
+What is Level Sampling:
+Textures look bad when viewed at a distance or at steep angles: a single screen pixel maps to a large region of the texture, and grabbing just one texel from that region creates aliasing. Mipmaps precompute downsampled versions of the texture at half resolution each level. Level sampling picks the right mip level so that the texel footprint roughly matches the screen pixel footprint, eliminating aliasing without expensive pixel by pixel computation.
+
+Implementation:
+get_level() estimates the appropriate level by computing the UV footprint of one screen pixel. The differentials du/dx, dv/dx, du/dy, dv/dy are obtained by evaluating barycentric UVs at (x+1, y) and (x, y+1) and subtracting the center UV. After scaling by texture dimensions to convert to texel units, the longer of the two footprint vectors determines the level: D = log2(max(|du/dx footprint|, |du/dy footprint|)).
+
+L_ZERO: always samples mip level 0.
+L_NEAREST: rounds D to the nearest integer level and clamps.
+L_LINEAR: interpolates between floor(D) and ceil(D) levels, blending two sample calls with weight t = D - floor(D).
+
+Tradeoffs:
+
+Pixel sampling (nearest vs. bilinear):
+- Speed: nearest is faster.
+- Memory: no extra memory for either, both use the same base texture.
+- Antialiasing: bilinear smooths magnification artifacts but does nothing for minification aliasing.
+
+Level sampling (L_ZERO / L_NEAREST / L_LINEAR):
+- Speed: L_ZERO is fastest, L_NEAREST is second fastest, L_LINEAR is the slowest.
+- Memory: mipmaps adds extra texture memory (1/4 + 1/16 + ... of base size).
+- Antialiasing: L_ZERO has no effect, L_LINEAR is smoother than L_NEAREST.
+
